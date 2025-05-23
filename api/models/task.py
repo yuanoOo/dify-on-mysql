@@ -5,6 +5,7 @@ from celery import states  # type: ignore
 from models.base import Base
 
 from .engine import db
+from .types import adjusted_text
 
 
 class CeleryTask(Base):
@@ -22,7 +23,7 @@ class CeleryTask(Base):
         onupdate=lambda: datetime.now(UTC).replace(tzinfo=None),
         nullable=True,
     )
-    traceback = db.Column(db.Text, nullable=True)
+    traceback = db.Column(adjusted_text(), nullable=True)
     name = db.Column(db.String(155), nullable=True)
     args = db.Column(db.LargeBinary, nullable=True)
     kwargs = db.Column(db.LargeBinary, nullable=True)

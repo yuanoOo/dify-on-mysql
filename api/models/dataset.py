@@ -55,7 +55,7 @@ class Dataset(Base):
     id = db.Column(StringUUID, **uuid_default())
     tenant_id = db.Column(StringUUID, nullable=False)
     name = db.Column(db.String(255), nullable=False)
-    description = db.Column(db.Text, nullable=True)
+    description = db.Column(adjusted_text(), nullable=True)
     provider = db.Column(db.String(255), nullable=False, **varchar_default("vendor"))
     permission = db.Column(db.String(255), nullable=False, **varchar_default("only_me"))
     data_source_type = db.Column(db.String(255))
@@ -275,7 +275,7 @@ class DatasetProcessRule(Base):
     id = db.Column(StringUUID, nullable=False, **uuid_default())
     dataset_id = db.Column(StringUUID, nullable=False)
     mode = db.Column(db.String(255), nullable=False, **varchar_default("automatic"))
-    rules = db.Column(db.Text, nullable=True)
+    rules = db.Column(adjusted_text(), nullable=True)
     created_by = db.Column(StringUUID, nullable=False)
     created_at = db.Column(db.DateTime, nullable=False, server_default=func.current_timestamp())
 
@@ -334,7 +334,7 @@ class Document(Base):
     processing_started_at = db.Column(db.DateTime, nullable=True)
 
     # parsing
-    file_id = db.Column(db.Text, nullable=True)
+    file_id = db.Column(adjusted_text(), nullable=True)
     word_count = db.Column(db.Integer, nullable=True)
     parsing_completed_at = db.Column(db.DateTime, nullable=True)
 
@@ -355,7 +355,7 @@ class Document(Base):
     paused_at = db.Column(db.DateTime, nullable=True)
 
     # error
-    error = db.Column(db.Text, nullable=True)
+    error = db.Column(adjusted_text(), nullable=True)
     stopped_at = db.Column(db.DateTime, nullable=True)
 
     # basic fields
@@ -453,12 +453,13 @@ class Document(Base):
 
     @property
     def hit_count(self):
-        return (
+        result = (
             db.session.query(DocumentSegment)
             .with_entities(func.coalesce(func.sum(DocumentSegment.hit_count)))
             .filter(DocumentSegment.document_id == self.id)
             .scalar()
         )
+        return float(result) if result is not None else 0.0
 
     @property
     def uploader(self):
@@ -664,8 +665,8 @@ class DocumentSegment(Base):
     dataset_id = db.Column(StringUUID, nullable=False)
     document_id = db.Column(StringUUID, nullable=False)
     position: Mapped[int]
-    content = db.Column(db.Text, nullable=False)
-    answer = db.Column(db.Text, nullable=True)
+    content = db.Column(adjusted_text(), nullable=False)
+    answer = db.Column(adjusted_text(), nullable=True)
     word_count = db.Column(db.Integer, nullable=False)
     tokens = db.Column(db.Integer, nullable=False)
 
@@ -686,7 +687,7 @@ class DocumentSegment(Base):
     updated_at = db.Column(db.DateTime, nullable=False, server_default=func.current_timestamp())
     indexing_at = db.Column(db.DateTime, nullable=True)
     completed_at = db.Column(db.DateTime, nullable=True)
-    error = db.Column(db.Text, nullable=True)
+    error = db.Column(adjusted_text(), nullable=True)
     stopped_at = db.Column(db.DateTime, nullable=True)
 
     @property
@@ -813,7 +814,7 @@ class ChildChunk(Base):
     document_id = db.Column(StringUUID, nullable=False)
     segment_id = db.Column(StringUUID, nullable=False)
     position = db.Column(db.Integer, nullable=False)
-    content = db.Column(db.Text, nullable=False)
+    content = db.Column(adjusted_text(), nullable=False)
     word_count = db.Column(db.Integer, nullable=False)
     # indexing fields
     index_node_id = db.Column(db.String(255), nullable=True)
@@ -825,7 +826,7 @@ class ChildChunk(Base):
     updated_at = db.Column(db.DateTime, nullable=False, server_default=db.text("CURRENT_TIMESTAMP(0)"))
     indexing_at = db.Column(db.DateTime, nullable=True)
     completed_at = db.Column(db.DateTime, nullable=True)
-    error = db.Column(db.Text, nullable=True)
+    error = db.Column(adjusted_text(), nullable=True)
 
     @property
     def dataset(self):
@@ -850,7 +851,7 @@ class AppDatasetJoin(Base):
     id = db.Column(StringUUID, primary_key=True, nullable=False, **uuid_default())
     app_id = db.Column(StringUUID, nullable=False)
     dataset_id = db.Column(StringUUID, nullable=False)
-    created_at = db.Column(db.DateTime, nullable=False, server_default=db.func.current_timestamp())
+    created_at = db.Column(db.DateTime, nullable=False, server_default=func.current_timestamp())
 
     @property
     def app(self):
@@ -866,12 +867,12 @@ class DatasetQuery(Base):
 
     id = db.Column(StringUUID, primary_key=True, nullable=False, **uuid_default())
     dataset_id = db.Column(StringUUID, nullable=False)
-    content = db.Column(db.Text, nullable=False)
+    content = db.Column(adjusted_text(), nullable=False)
     source = db.Column(db.String(255), nullable=False)
     source_app_id = db.Column(StringUUID, nullable=True)
     created_by_role = db.Column(no_length_string(), nullable=False)
     created_by = db.Column(StringUUID, nullable=False)
-    created_at = db.Column(db.DateTime, nullable=False, server_default=db.func.current_timestamp())
+    created_at = db.Column(db.DateTime, nullable=False, server_default=func.current_timestamp())
 
 
 class DatasetKeywordTable(Base):

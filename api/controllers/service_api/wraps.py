@@ -262,9 +262,18 @@ def validate_and_get_api_token(scope: str | None = None):
                 ApiToken.type == scope,
             )
             .values(last_used_at=current_time)
-            .returning(ApiToken)
+            # .returning(ApiToken)  mysql does not support 'returning'
         )
-        result = session.execute(update_stmt)
+        session.execute(update_stmt)
+        select_stmt = (
+            select(ApiToken)
+            .where(
+                ApiToken.token == auth_token,
+                (ApiToken.last_used_at.is_(None) | (ApiToken.last_used_at < cutoff_time)),
+                ApiToken.type == scope,
+            )
+        )
+        result = session.execute(select_stmt)
         api_token = result.scalar_one_or_none()
 
         if not api_token:

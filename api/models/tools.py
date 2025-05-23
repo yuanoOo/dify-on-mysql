@@ -14,7 +14,7 @@ from models.base import Base
 
 from .engine import db
 from .model import Account, App, Tenant
-from .types import StringUUID, no_length_string, uuid_default
+from .types import StringUUID, no_length_string, uuid_default, adjusted_text
 
 
 class BuiltinToolProvider(Base):
@@ -38,7 +38,7 @@ class BuiltinToolProvider(Base):
     # name of the tool provider
     provider: Mapped[str] = mapped_column(db.String(256), nullable=False)
     # credential of the tool provider
-    encrypted_credentials: Mapped[str] = mapped_column(db.Text, nullable=True)
+    encrypted_credentials: Mapped[str] = mapped_column(adjusted_text(), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         db.DateTime, nullable=False, server_default=db.text("CURRENT_TIMESTAMP(0)")
     )
@@ -68,18 +68,18 @@ class ApiToolProvider(Base):
     # icon
     icon = db.Column(db.String(255), nullable=False)
     # original schema
-    schema = db.Column(db.Text, nullable=False)
+    schema = db.Column(adjusted_text(), nullable=False)
     schema_type_str: Mapped[str] = db.Column(db.String(40), nullable=False)
     # who created this tool
     user_id = db.Column(StringUUID, nullable=False)
     # tenant id
     tenant_id = db.Column(StringUUID, nullable=False)
     # description of the provider
-    description = db.Column(db.Text, nullable=False)
+    description = db.Column(adjusted_text(), nullable=False)
     # json format tools
-    tools_str = db.Column(db.Text, nullable=False)
+    tools_str = db.Column(adjusted_text(), nullable=False)
     # json format credentials
-    credentials_str = db.Column(db.Text, nullable=False)
+    credentials_str = db.Column(adjusted_text(), nullable=False)
     # privacy policy
     privacy_policy = db.Column(db.String(255), nullable=True)
     # custom_disclaimer
@@ -159,9 +159,9 @@ class WorkflowToolProvider(Base):
     # tenant id
     tenant_id: Mapped[str] = mapped_column(StringUUID, nullable=False)
     # description of the provider
-    description: Mapped[str] = mapped_column(db.Text, nullable=False)
+    description: Mapped[str] = mapped_column(adjusted_text(), nullable=False)
     # parameter configuration
-    parameter_configuration: Mapped[str] = mapped_column(db.Text, nullable=False, default="[]")
+    parameter_configuration: Mapped[str] = mapped_column(adjusted_text(), nullable=False, default="[]")
     # privacy policy
     privacy_policy: Mapped[str] = mapped_column(db.String(255), nullable=True, server_default="")
 
@@ -213,11 +213,11 @@ class ToolModelInvoke(Base):
     # tool name
     tool_name = db.Column(db.String(40), nullable=False)
     # invoke parameters
-    model_parameters = db.Column(db.Text, nullable=False)
+    model_parameters = db.Column(adjusted_text(), nullable=False)
     # prompt messages
-    prompt_messages = db.Column(db.Text, nullable=False)
+    prompt_messages = db.Column(adjusted_text(), nullable=False)
     # invoke response
-    model_response = db.Column(db.Text, nullable=False)
+    model_response = db.Column(adjusted_text(), nullable=False)
 
     prompt_tokens = db.Column(db.Integer, nullable=False, server_default=db.text("0"))
     answer_tokens = db.Column(db.Integer, nullable=False, server_default=db.text("0"))
@@ -252,7 +252,7 @@ class ToolConversationVariables(Base):
     # conversation id
     conversation_id = db.Column(StringUUID, nullable=False)
     # variables pool
-    variables_str = db.Column(db.Text, nullable=False)
+    variables_str = db.Column(adjusted_text(), nullable=False)
 
     created_at = db.Column(db.DateTime, nullable=False, server_default=func.current_timestamp())
     updated_at = db.Column(db.DateTime, nullable=False, server_default=func.current_timestamp())
@@ -304,18 +304,18 @@ class DeprecatedPublishedAppTool(Base):
         db.UniqueConstraint("app_id", "user_id", name="unique_published_app_tool"),
     )
 
-    id = db.Column(StringUUID, server_default=db.text("uuid_generate_v4()"))
+    id = db.Column(StringUUID, **uuid_default())
     # id of the app
-    app_id = db.Column(StringUUID, ForeignKey("apps.id"), nullable=False)
+    app_id = db.Column(StringUUID, ForeignKey("apps.id", ondelete='CASCADE'), nullable=False)
 
     user_id: Mapped[str] = db.Column(StringUUID, nullable=False)
     # who published this tool
-    description = db.Column(db.Text, nullable=False)
+    description = db.Column(adjusted_text(), nullable=False)
     # llm_description of the tool, for LLM
-    llm_description = db.Column(db.Text, nullable=False)
+    llm_description = db.Column(adjusted_text(), nullable=False)
     # query description, query will be seem as a parameter of the tool,
     # to describe this parameter to llm, we need this field
-    query_description = db.Column(db.Text, nullable=False)
+    query_description = db.Column(adjusted_text(), nullable=False)
     # query name, the name of the query parameter
     query_name = db.Column(db.String(40), nullable=False)
     # name of the tool provider

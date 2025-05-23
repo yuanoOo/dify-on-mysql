@@ -195,7 +195,7 @@ class Tenant(Base):
 
     id = db.Column(StringUUID, **uuid_default())
     name = db.Column(db.String(255), nullable=False)
-    encrypt_public_key = db.Column(db.Text)
+    encrypt_public_key = db.Column(adjusted_text())
     plan = db.Column(db.String(255), nullable=False, **varchar_default("basic"))
     status = db.Column(db.String(255), nullable=False, **varchar_default("normal"))
     custom_config = db.Column(adjusted_text())
@@ -231,7 +231,7 @@ class TenantAccountJoin(Base):
     tenant_id = db.Column(StringUUID, nullable=False)
     account_id = db.Column(StringUUID, nullable=False)
     current = db.Column(db.Boolean, nullable=False, server_default=db.text("false"))
-    role = db.Column(db.String(16), nullable=False, server_default="normal")
+    role = db.Column(db.String(16), nullable=False, default="normal")
     invited_by = db.Column(StringUUID, nullable=True)
     created_at = db.Column(db.DateTime, nullable=False, server_default=func.current_timestamp())
     updated_at = db.Column(db.DateTime, nullable=False, server_default=func.current_timestamp())
