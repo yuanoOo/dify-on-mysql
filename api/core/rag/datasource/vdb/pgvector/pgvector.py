@@ -1,3 +1,4 @@
+import hashlib
 import json
 import logging
 import uuid
@@ -61,12 +62,12 @@ CREATE TABLE IF NOT EXISTS {table_name} (
 """
 
 SQL_CREATE_INDEX = """
-CREATE INDEX IF NOT EXISTS embedding_cosine_v1_idx ON {table_name} 
+CREATE INDEX IF NOT EXISTS embedding_cosine_v1_idx_{index_hash} ON {table_name}
 USING hnsw (embedding vector_cosine_ops) WITH (m = 16, ef_construction = 64);
 """
 
 SQL_CREATE_INDEX_PG_BIGM = """
-CREATE INDEX IF NOT EXISTS bigm_idx ON {table_name}
+CREATE INDEX IF NOT EXISTS bigm_idx_{index_hash} ON {table_name}
 USING gin (text gin_bigm_ops);
 """
 
@@ -76,6 +77,7 @@ class PGVector(BaseVector):
         super().__init__(collection_name)
         self.pool = self._create_connection_pool(config)
         self.table_name = f"embedding_{collection_name}"
+        self.index_hash = hashlib.md5(self.table_name.encode()).hexdigest()[:8]
         self.pg_bigm = config.pg_bigm
 
     def get_type(self) -> str:
@@ -167,7 +169,6 @@ class PGVector(BaseVector):
         Search the nearest neighbors to a vector.
 
         :param query_vector: The input vector to search for similar items.
-        :param top_k: The number of nearest neighbors to return, default is 5.
         :return: List of Documents that are nearest to the query vector.
         """
         top_k = kwargs.get("top_k", 4)
@@ -177,7 +178,7 @@ class PGVector(BaseVector):
         where_clause = ""
         if document_ids_filter:
             document_ids = ", ".join(f"'{id}'" for id in document_ids_filter)
-            where_clause = f" WHERE metadata->>'document_id' in ({document_ids}) "
+            where_clause = f" WHERE meta->>'document_id' in ({document_ids}) "
 
         with self._get_cursor() as cur:
             cur.execute(
@@ -205,7 +206,7 @@ class PGVector(BaseVector):
             where_clause = ""
             if document_ids_filter:
                 document_ids = ", ".join(f"'{id}'" for id in document_ids_filter)
-                where_clause = f" AND metadata->>'document_id' in ({document_ids}) "
+                where_clause = f" AND meta->>'document_id' in ({document_ids}) "
             if self.pg_bigm:
                 cur.execute("SET pg_bigm.similarity_limit TO 0.000001")
                 cur.execute(
@@ -257,10 +258,9 @@ class PGVector(BaseVector):
                 # PG hnsw index only support 2000 dimension or less
                 # ref: https://github.com/pgvector/pgvector?tab=readme-ov-file#indexing
                 if dimension <= 2000:
-                    cur.execute(SQL_CREATE_INDEX.format(table_name=self.table_name))
+                    cur.execute(SQL_CREATE_INDEX.format(table_name=self.table_name, index_hash=self.index_hash))
                 if self.pg_bigm:
-                    cur.execute("CREATE EXTENSION IF NOT EXISTS pg_bigm")
-                    cur.execute(SQL_CREATE_INDEX_PG_BIGM.format(table_name=self.table_name))
+                    cur.execute(SQL_CREATE_INDEX_PG_BIGM.format(table_name=self.table_name, index_hash=self.index_hash))
             redis_client.set(collection_exist_cache_key, 1, ex=3600)
 
 

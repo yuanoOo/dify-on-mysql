@@ -29,6 +29,8 @@ import { useChildSegmentListKey, useSegmentListKey } from '@/service/knowledge/u
 import useEditDocumentMetadata from '../metadata/hooks/use-edit-dataset-metadata'
 import DatasetMetadataDrawer from '../metadata/metadata-dataset/dataset-metadata-drawer'
 import StatusWithAction from '../common/document-status-with-action/status-with-action'
+import { LanguagesSupported } from '@/i18n/language'
+import { getLocaleOnClient } from '@/i18n'
 
 const FolderPlusIcon = ({ className }: React.SVGProps<SVGElement>) => {
   return <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" className={className ?? ''}>
@@ -64,7 +66,7 @@ const EmptyElement: FC<{ canAdd: boolean; onClick: () => void; type?: 'upload' |
       <div className={s.emptySymbolIconWrapper}>
         {type === 'upload' ? <FolderPlusIcon /> : <NotionIcon />}
       </div>
-      <span className={s.emptyTitle}>{t('datasetDocuments.list.empty.title')}<ThreeDotsIcon className='inline relative -top-3 -left-1.5' /></span>
+      <span className={s.emptyTitle}>{t('datasetDocuments.list.empty.title')}<ThreeDotsIcon className='relative -left-1.5 -top-3 inline' /></span>
       <div className={s.emptyTip}>
         {t(`datasetDocuments.list.empty.${type}.tip`)}
       </div>
@@ -98,7 +100,7 @@ const Documents: FC<IDocumentsProps> = ({ datasetId }) => {
   const isDataSourceWeb = dataset?.data_source_type === DataSourceType.WEB
   const isDataSourceFile = dataset?.data_source_type === DataSourceType.FILE
   const embeddingAvailable = !!dataset?.embedding_available
-
+  const locale = getLocaleOnClient()
   const debouncedSearchValue = useDebounce(searchValue, { wait: 500 })
 
   const { data: documentsRes, isFetching: isListLoading } = useDocumentList({
@@ -252,22 +254,27 @@ const Documents: FC<IDocumentsProps> = ({ datasetId }) => {
   })
 
   return (
-    <div className='flex flex-col h-full overflow-y-auto'>
+    <div className='flex h-full flex-col overflow-y-auto'>
       <div className='flex flex-col justify-center gap-1 px-6 pt-4'>
         <h1 className='text-base font-semibold text-text-primary'>{t('datasetDocuments.list.title')}</h1>
-        <div className='flex items-center text-sm font-normal text-text-tertiary space-x-0.5'>
+        <div className='flex items-center space-x-0.5 text-sm font-normal text-text-tertiary'>
           <span>{t('datasetDocuments.list.desc')}</span>
           <a
             className='flex items-center text-text-accent'
             target='_blank'
-            href='https://docs.dify.ai/guides/knowledge-base/integrate-knowledge-within-application'>
+            href={
+              locale === LanguagesSupported[1]
+                ? 'https://docs.dify.ai/zh-hans/guides/knowledge-base/integrate-knowledge-within-application'
+                : 'https://docs.dify.ai/en/guides/knowledge-base/integrate-knowledge-within-application'
+            }
+            >
             <span>{t('datasetDocuments.list.learnMore')}</span>
-            <RiExternalLinkLine className='w-3 h-3' />
+            <RiExternalLinkLine className='h-3 w-3' />
           </a>
         </div>
       </div>
-      <div className='flex flex-col px-6 py-4 flex-1'>
-        <div className='flex items-center justify-between flex-wrap'>
+      <div className='flex flex-1 flex-col px-6 py-4'>
+        <div className='flex flex-wrap items-center justify-between'>
           <Input
             showLeftIcon
             showClearIcon
@@ -276,13 +283,13 @@ const Documents: FC<IDocumentsProps> = ({ datasetId }) => {
             onChange={e => handleInputChange(e.target.value)}
             onClear={() => handleInputChange('')}
           />
-          <div className='flex gap-2 justify-center items-center !h-8'>
+          <div className='flex !h-8 items-center justify-center gap-2'>
             {!isFreePlan && <AutoDisabledDocument datasetId={datasetId} />}
             <IndexFailed datasetId={datasetId} />
             {!embeddingAvailable && <StatusWithAction type='warning' description={t('dataset.embeddingModelNotAvailable')} />}
             {embeddingAvailable && (
               <Button variant='secondary' className='shrink-0' onClick={showEditMetadataModal}>
-                <RiDraftLine className='size-4 mr-1' />
+                <RiDraftLine className='mr-1 size-4' />
                 {t('dataset.metadata.metadata')}
               </Button>
             )}
@@ -300,7 +307,7 @@ const Documents: FC<IDocumentsProps> = ({ datasetId }) => {
             )}
             {embeddingAvailable && (
               <Button variant='primary' onClick={routeToDocCreate} className='shrink-0'>
-                <PlusIcon className={cn('h-4 w-4 mr-2 stroke-current')} />
+                <PlusIcon className={cn('mr-2 h-4 w-4 stroke-current')} />
                 {isDataSourceNotion && t('datasetDocuments.list.addPages')}
                 {isDataSourceWeb && t('datasetDocuments.list.addUrl')}
                 {(!dataset?.data_source_type || isDataSourceFile) && t('datasetDocuments.list.addFile')}

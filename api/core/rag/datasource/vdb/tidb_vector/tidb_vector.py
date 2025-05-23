@@ -105,10 +105,12 @@ class TiDBVector(BaseVector):
                         text TEXT NOT NULL,
                         meta JSON NOT NULL,
                         doc_id VARCHAR(64) AS (JSON_UNQUOTE(JSON_EXTRACT(meta, '$.doc_id'))) STORED,
+                        document_id VARCHAR(64) AS (JSON_UNQUOTE(JSON_EXTRACT(meta, '$.document_id'))) STORED,
                         vector VECTOR<FLOAT>({dimension}) NOT NULL,
                         create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
                         update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                         KEY (doc_id),
+                        KEY (document_id),
                         VECTOR INDEX idx_vector (({tidb_dist_func}(vector))) USING HNSW
                     );
                 """)
@@ -185,7 +187,6 @@ class TiDBVector(BaseVector):
     def search_by_vector(self, query_vector: list[float], **kwargs: Any) -> list[Document]:
         top_k = kwargs.get("top_k", 4)
         score_threshold = float(kwargs.get("score_threshold") or 0.0)
-        filter = kwargs.get("filter")
         distance = 1 - score_threshold
 
         query_vector_str = ", ".join(format(x) for x in query_vector)
@@ -204,9 +205,9 @@ class TiDBVector(BaseVector):
 
         with Session(self._engine) as session:
             select_statement = sql_text(f"""
-                SELECT meta, text, distance 
+                SELECT meta, text, distance
                 FROM (
-                  SELECT 
+                  SELECT
                     meta,
                     text,
                     {tidb_dist_func}(vector, :query_vector_str) AS distance

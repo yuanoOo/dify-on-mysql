@@ -10,6 +10,7 @@ from core.rag.data_post_processor.data_post_processor import DataPostProcessor
 from core.rag.datasource.keyword.keyword_factory import Keyword
 from core.rag.datasource.vdb.vector_factory import Vector
 from core.rag.embedding.retrieval import RetrievalSegments
+from core.rag.entities.metadata_entities import MetadataCondition
 from core.rag.index_processor.constant.index_type import IndexType
 from core.rag.models.document import Document
 from core.rag.rerank.rerank_type import RerankMode
@@ -46,7 +47,7 @@ class RetrievalService:
         if not query:
             return []
         dataset = cls._get_dataset(dataset_id)
-        if not dataset or dataset.available_document_count == 0 or dataset.available_segment_count == 0:
+        if not dataset:
             return []
 
         all_documents: list[Document] = []
@@ -97,6 +98,7 @@ class RetrievalService:
                         all_documents=all_documents,
                         retrieval_method=retrieval_method,
                         exceptions=exceptions,
+                        document_ids_filter=document_ids_filter,
                     )
                 )
             concurrent.futures.wait(futures, timeout=30, return_when=concurrent.futures.ALL_COMPLETED)
@@ -118,12 +120,25 @@ class RetrievalService:
         return all_documents
 
     @classmethod
-    def external_retrieve(cls, dataset_id: str, query: str, external_retrieval_model: Optional[dict] = None):
+    def external_retrieve(
+        cls,
+        dataset_id: str,
+        query: str,
+        external_retrieval_model: Optional[dict] = None,
+        metadata_filtering_conditions: Optional[dict] = None,
+    ):
         dataset = db.session.query(Dataset).filter(Dataset.id == dataset_id).first()
         if not dataset:
             return []
+        metadata_condition = (
+            MetadataCondition(**metadata_filtering_conditions) if metadata_filtering_conditions else None
+        )
         all_documents = ExternalDatasetService.fetch_external_knowledge_retrieval(
-            dataset.tenant_id, dataset_id, query, external_retrieval_model or {}
+            dataset.tenant_id,
+            dataset_id,
+            query,
+            external_retrieval_model or {},
+            metadata_condition=metadata_condition,
         )
         return all_documents
 
@@ -222,6 +237,7 @@ class RetrievalService:
         all_documents: list,
         retrieval_method: str,
         exceptions: list,
+        document_ids_filter: Optional[list[str]] = None,
     ):
         with flask_app.app_context():
             try:
@@ -231,7 +247,9 @@ class RetrievalService:
 
                 vector_processor = Vector(dataset=dataset)
 
-                documents = vector_processor.search_by_full_text(cls.escape_query_for_search(query), top_k=top_k)
+                documents = vector_processor.search_by_full_text(
+                    cls.escape_query_for_search(query), top_k=top_k, document_ids_filter=document_ids_filter
+                )
                 if documents:
                     if (
                         reranking_model

@@ -22,7 +22,7 @@ const InputCombined: FC<Props> = ({
   onChange,
   readOnly,
 }) => {
-  const className = cn('grow p-0.5 h-6 text-xs')
+  const className = cn('h-6 grow p-0.5 text-xs')
   if (type === DataType.time) {
     return (
       <Datepicker
@@ -40,7 +40,7 @@ const InputCombined: FC<Props> = ({
           className={cn(className, 'rounded-l-md')}
           value={value}
           onChange={onChange}
-          size='sm'
+          size='regular'
           controlWrapClassName='overflow-hidden'
           controlClassName='pt-0 pb-0'
           readOnly={readOnly}

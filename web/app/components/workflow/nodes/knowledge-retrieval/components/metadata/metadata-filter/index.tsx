@@ -10,6 +10,7 @@ import Tooltip from '@/app/components/base/tooltip'
 import type { MetadataShape } from '@/app/components/workflow/nodes/knowledge-retrieval/types'
 import { MetadataFilteringModeEnum } from '@/app/components/workflow/nodes/knowledge-retrieval/types'
 import ModelParameterModal from '@/app/components/header/account-setting/model-provider-page/model-parameter-modal'
+import { noop } from 'lodash-es'
 
 type MetadataFilterProps = {
   metadataFilterMode?: MetadataFilteringModeEnum
@@ -38,10 +39,11 @@ const MetadataFilter = ({
       disabled={metadataFilterMode === MetadataFilteringModeEnum.disabled || metadataFilterMode === MetadataFilteringModeEnum.manual}
       collapsed={collapsed}
       onCollapse={setCollapsed}
-      trigger={
-        <div className='grow flex items-center justify-between pr-4'>
+      hideCollapseIcon
+      trigger={collapseIcon => (
+        <div className='flex grow items-center justify-between pr-4'>
           <div className='flex items-center'>
-            <div className='mr-0.5 system-sm-semibold-uppercase text-text-secondary'>
+            <div className='system-sm-semibold-uppercase mr-0.5 text-text-secondary'>
               {t('workflow.nodes.knowledgeRetrieval.metadata.title')}
             </div>
             <Tooltip
@@ -51,6 +53,7 @@ const MetadataFilter = ({
                 </div>
               )}
             />
+            {collapseIcon}
           </div>
           <div className='flex items-center'>
             <MetadataFilterSelector
@@ -66,17 +69,18 @@ const MetadataFilter = ({
             }
           </div>
         </div>
-      }
+      )}
     >
       <>
         {
           metadataFilterMode === MetadataFilteringModeEnum.automatic && (
             <>
-              <div className='px-4 body-xs-regular text-text-tertiary'>
+              <div className='body-xs-regular px-4 text-text-tertiary'>
                 {t('workflow.nodes.knowledgeRetrieval.metadata.options.automatic.desc')}
               </div>
               <div className='mt-1 px-4'>
                 <ModelParameterModal
+                  portalToFollowElemContentClassName='z-[50]'
                   popupClassName='!w-[387px]'
                   isInWorkflow
                   isAdvancedMode={true}
@@ -84,8 +88,8 @@ const MetadataFilter = ({
                   provider={metadataModelConfig?.provider || ''}
                   completionParams={metadataModelConfig?.completion_params || { temperature: 0.7 }}
                   modelId={metadataModelConfig?.name || ''}
-                  setModel={handleMetadataModelChange || (() => {})}
-                  onCompletionParamsChange={handleMetadataCompletionParamsChange || (() => {})}
+                  setModel={handleMetadataModelChange || noop}
+                  onCompletionParamsChange={handleMetadataCompletionParamsChange || noop}
                   hideDebugWithMultipleModel
                   debugWithMultipleModel={false}
                 />

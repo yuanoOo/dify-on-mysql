@@ -2,37 +2,35 @@ import json
 import re
 from collections.abc import Mapping
 from datetime import datetime
-from enum import Enum
-from typing import TYPE_CHECKING, Optional
+from enum import Enum, StrEnum
+from typing import TYPE_CHECKING, Any, Literal, Optional, cast
 
 from core.plugin.entities.plugin import GenericProviderID
 from core.tools.entities.tool_entities import ToolProviderType
+from core.tools.signature import sign_tool_file
 from services.plugin.plugin_service import PluginService
 
 if TYPE_CHECKING:
     from models.workflow import Workflow
 
-from enum import StrEnum
-from typing import TYPE_CHECKING, Any, Literal, cast
-
 import sqlalchemy as sa
 from flask import request
-from flask_login import UserMixin  # type: ignore
+from flask_login import UserMixin
 from sqlalchemy import Float, Index, PrimaryKeyConstraint, func, text
 from sqlalchemy.orm import Mapped, Session, mapped_column
 
 from configs import dify_config
+from constants import DEFAULT_FILE_NUMBER_LIMITS
 from core.file import FILE_MODEL_IDENTITY, File, FileTransferMethod, FileType
 from core.file import helpers as file_helpers
-from core.file.tool_file_parser import ToolFileParser
 from libs.helper import generate_string
-from models.base import Base
-from models.enums import CreatedByRole
-from models.workflow import WorkflowRunStatus
 
 from .account import Account, Tenant
+from .base import Base
 from .engine import db
+from .enums import CreatedByRole
 from .types import StringUUID, no_length_string, text_default, uuid_default, varchar_default
+from .workflow import WorkflowRunStatus
 
 if TYPE_CHECKING:
     from .workflow import Workflow
@@ -441,7 +439,7 @@ class AppModelConfig(Base):
             else {
                 "image": {
                     "enabled": False,
-                    "number_limits": 3,
+                    "number_limits": DEFAULT_FILE_NUMBER_LIMITS,
                     "detail": "high",
                     "transfer_methods": ["remote_url", "local_file"],
                 }
@@ -603,7 +601,7 @@ class InstalledApp(Base):
         return tenant
 
 
-class Conversation(db.Model):  # type: ignore[name-defined]
+class Conversation(Base):
     __tablename__ = "conversations"
     __table_args__ = (
         db.PrimaryKeyConstraint("id", name="conversation_pkey"),
@@ -790,18 +788,18 @@ class Conversation(db.Model):  # type: ignore[name-defined]
             WorkflowRunStatus.SUCCEEDED: 0,
             WorkflowRunStatus.FAILED: 0,
             WorkflowRunStatus.STOPPED: 0,
-            WorkflowRunStatus.PARTIAL_SUCCESSED: 0,
+            WorkflowRunStatus.PARTIAL_SUCCEEDED: 0,
         }
 
         for message in messages:
             if message.workflow_run:
-                status_counts[message.workflow_run.status] += 1
+                status_counts[WorkflowRunStatus(message.workflow_run.status)] += 1
 
         return (
             {
                 "success": status_counts[WorkflowRunStatus.SUCCEEDED],
                 "failed": status_counts[WorkflowRunStatus.FAILED],
-                "partial_success": status_counts[WorkflowRunStatus.PARTIAL_SUCCESSED],
+                "partial_success": status_counts[WorkflowRunStatus.PARTIAL_SUCCEEDED],
             }
             if messages
             else None
@@ -837,8 +835,35 @@ class Conversation(db.Model):  # type: ignore[name-defined]
     def in_debug_mode(self):
         return self.override_model_configs is not None
 
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "app_id": self.app_id,
+            "app_model_config_id": self.app_model_config_id,
+            "model_provider": self.model_provider,
+            "override_model_configs": self.override_model_configs,
+            "model_id": self.model_id,
+            "mode": self.mode,
+            "name": self.name,
+            "summary": self.summary,
+            "inputs": self.inputs,
+            "introduction": self.introduction,
+            "system_instruction": self.system_instruction,
+            "system_instruction_tokens": self.system_instruction_tokens,
+            "status": self.status,
+            "invoke_from": self.invoke_from,
+            "from_source": self.from_source,
+            "from_end_user_id": self.from_end_user_id,
+            "from_account_id": self.from_account_id,
+            "read_at": self.read_at,
+            "read_account_id": self.read_account_id,
+            "dialogue_count": self.dialogue_count,
+            "created_at": self.created_at,
+            "updated_at": self.updated_at,
+        }
 
-class Message(db.Model):  # type: ignore[name-defined]
+
+class Message(Base):
     __tablename__ = "messages"
     __table_args__ = (
         PrimaryKeyConstraint("id", name="message_pkey"),
@@ -960,9 +985,7 @@ class Message(db.Model):  # type: ignore[name-defined]
                 if not tool_file_id:
                     continue
 
-                sign_url = ToolFileParser.get_tool_file_manager().sign_file(
-                    tool_file_id=tool_file_id, extension=extension
-                )
+                sign_url = sign_tool_file(tool_file_id=tool_file_id, extension=extension)
             elif "file-preview" in url:
                 # get upload file id
                 upload_file_id_pattern = r"\/files\/([\w-]+)\/file-preview?\?timestamp="
@@ -986,7 +1009,9 @@ class Message(db.Model):  # type: ignore[name-defined]
                 sign_url = file_helpers.get_signed_file_url(upload_file_id)
             else:
                 continue
-
+            # if as_attachment is in the url, add it to the sign_url.
+            if "as_attachment" in url:
+                sign_url += "&as_attachment=true"
             re_sign_file_url_answer = re_sign_file_url_answer.replace(url, sign_url)
 
         return re_sign_file_url_answer
@@ -1062,12 +1087,7 @@ class Message(db.Model):  # type: ignore[name-defined]
 
     @property
     def retriever_resources(self):
-        return (
-            db.session.query(DatasetRetrieverResource)
-            .filter(DatasetRetrieverResource.message_id == self.id)
-            .order_by(DatasetRetrieverResource.position.asc())
-            .all()
-        )
+        return self.message_metadata_dict.get("retriever_resources") if self.message_metadata else []
 
     @property
     def message_files(self):
@@ -1126,7 +1146,7 @@ class Message(db.Model):  # type: ignore[name-defined]
             files.append(file)
 
         result = [
-            {"belongs_to": message_file.belongs_to, **file.to_dict()}
+            {"belongs_to": message_file.belongs_to, "upload_file_id": message_file.upload_file_id, **file.to_dict()}
             for (file, message_file) in zip(files, message_files)
         ]
 
@@ -1190,7 +1210,7 @@ class Message(db.Model):  # type: ignore[name-defined]
         )
 
 
-class MessageFeedback(db.Model):  # type: ignore[name-defined]
+class MessageFeedback(Base):
     __tablename__ = "message_feedbacks"
     __table_args__ = (
         db.PrimaryKeyConstraint("id", name="message_feedback_pkey"),
@@ -1216,8 +1236,23 @@ class MessageFeedback(db.Model):  # type: ignore[name-defined]
         account = db.session.query(Account).filter(Account.id == self.from_account_id).first()
         return account
 
+    def to_dict(self):
+        return {
+            "id": str(self.id),
+            "app_id": str(self.app_id),
+            "conversation_id": str(self.conversation_id),
+            "message_id": str(self.message_id),
+            "rating": self.rating,
+            "content": self.content,
+            "from_source": self.from_source,
+            "from_end_user_id": str(self.from_end_user_id) if self.from_end_user_id else None,
+            "from_account_id": str(self.from_account_id) if self.from_account_id else None,
+            "created_at": self.created_at.isoformat(),
+            "updated_at": self.updated_at.isoformat(),
+        }
 
-class MessageFile(db.Model):  # type: ignore[name-defined]
+
+class MessageFile(Base):
     __tablename__ = "message_files"
     __table_args__ = (
         db.PrimaryKeyConstraint("id", name="message_file_pkey"),
@@ -1258,7 +1293,7 @@ class MessageFile(db.Model):  # type: ignore[name-defined]
     created_at: Mapped[datetime] = db.Column(db.DateTime, nullable=False, server_default=func.current_timestamp())
 
 
-class MessageAnnotation(db.Model):  # type: ignore[name-defined]
+class MessageAnnotation(Base):
     __tablename__ = "message_annotations"
     __table_args__ = (
         db.PrimaryKeyConstraint("id", name="message_annotation_pkey"),
@@ -1289,7 +1324,7 @@ class MessageAnnotation(db.Model):  # type: ignore[name-defined]
         return account
 
 
-class AppAnnotationHitHistory(db.Model):  # type: ignore[name-defined]
+class AppAnnotationHitHistory(Base):
     __tablename__ = "app_annotation_hit_histories"
     __table_args__ = (
         db.PrimaryKeyConstraint("id", name="app_annotation_hit_histories_pkey"),
@@ -1301,7 +1336,7 @@ class AppAnnotationHitHistory(db.Model):  # type: ignore[name-defined]
 
     id = db.Column(StringUUID, **uuid_default())
     app_id = db.Column(StringUUID, nullable=False)
-    annotation_id = db.Column(StringUUID, nullable=False)
+    annotation_id: Mapped[str] = db.Column(StringUUID, nullable=False)
     source = db.Column(db.Text, nullable=False)
     question = db.Column(db.Text, nullable=False)
     account_id = db.Column(StringUUID, nullable=False)
@@ -1327,7 +1362,7 @@ class AppAnnotationHitHistory(db.Model):  # type: ignore[name-defined]
         return account
 
 
-class AppAnnotationSetting(db.Model):  # type: ignore[name-defined]
+class AppAnnotationSetting(Base):
     __tablename__ = "app_annotation_settings"
     __table_args__ = (
         db.PrimaryKeyConstraint("id", name="app_annotation_settings_pkey"),
@@ -1342,26 +1377,6 @@ class AppAnnotationSetting(db.Model):  # type: ignore[name-defined]
     created_at = db.Column(db.DateTime, nullable=False, server_default=func.current_timestamp())
     updated_user_id = db.Column(StringUUID, nullable=False)
     updated_at = db.Column(db.DateTime, nullable=False, server_default=func.current_timestamp())
-
-    @property
-    def created_account(self):
-        account = (
-            db.session.query(Account)
-            .join(AppAnnotationSetting, AppAnnotationSetting.created_user_id == Account.id)
-            .filter(AppAnnotationSetting.id == self.annotation_id)
-            .first()
-        )
-        return account
-
-    @property
-    def updated_account(self):
-        account = (
-            db.session.query(Account)
-            .join(AppAnnotationSetting, AppAnnotationSetting.updated_user_id == Account.id)
-            .filter(AppAnnotationSetting.id == self.annotation_id)
-            .first()
-        )
-        return account
 
     @property
     def collection_binding_detail(self):
