@@ -163,6 +163,7 @@ if [ "$USE_AS_VECTOR_STORE" == "Y" ]; then
 fi
 
 update_env "SQLALCHEMY_DATABASE_URI_SCHEME" "mysql+pymysql"
+update_env "DB_TYPE" "mysql"
 update_env "DB_HOST" "$DB_HOST"
 update_env "DB_PORT" "$DB_PORT"
 update_env "DB_USERNAME" "$DB_USERNAME"
