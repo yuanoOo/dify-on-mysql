@@ -509,6 +509,8 @@ services:
       PLUGIN_MAX_PACKAGE_SIZE: ${PLUGIN_MAX_PACKAGE_SIZE:-52428800}
       INNER_API_KEY_FOR_PLUGIN: ${PLUGIN_DIFY_INNER_API_KEY:-QaHbTe77CtuXmsfyhR7+vRjI/+XbV1AaFy691iy+kGDv2Jvy0/eAh8Y1}
     depends_on:
+      oceanbase:
+        condition: service_healthy
       redis:
         condition: service_started
     volumes:
@@ -534,6 +536,8 @@ services:
       PLUGIN_MAX_PACKAGE_SIZE: ${PLUGIN_MAX_PACKAGE_SIZE:-52428800}
       INNER_API_KEY_FOR_PLUGIN: ${PLUGIN_DIFY_INNER_API_KEY:-QaHbTe77CtuXmsfyhR7+vRjI/+XbV1AaFy691iy+kGDv2Jvy0/eAh8Y1}
     depends_on:
+      oceanbase:
+        condition: service_healthy
       redis:
         condition: service_started
     volumes:
@@ -674,6 +678,9 @@ services:
       - "${EXPOSE_PLUGIN_DEBUGGING_PORT:-5003}:${PLUGIN_DEBUGGING_PORT:-5003}"
     volumes:
       - ./volumes/plugin_daemon:/app/storage
+    depends_on:
+      oceanbase:
+        condition: service_healthy
 
   # ssrf_proxy server
   # for more information, please refer to
@@ -930,6 +937,12 @@ services:
       MODE: MINI
     ports:
       - "${OCEANBASE_VECTOR_PORT:-2881}:2881"
+    healthcheck:
+      test: [ 'CMD-SHELL', 'obclient -h127.0.0.1 -P2881 -uroot@test -p$${OB_TENANT_PASSWORD} -e "SELECT 1;"' ]
+      interval: 10s
+      retries: 30
+      start_period: 30s
+      timeout: 10s
 
   # Oracle vector database
   oracle:
