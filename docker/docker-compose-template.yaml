@@ -424,7 +424,7 @@ services:
 
   # OceanBase vector database
   oceanbase:
-    image: oceanbase/oceanbase-ce:4.3.5.1-101000042025031818
+    image: oceanbase/oceanbase-ce:4.3.5-lts
     container_name: oceanbase
     profiles:
       - oceanbase
@@ -438,9 +438,16 @@ services:
       OB_SYS_PASSWORD: ${OCEANBASE_VECTOR_PASSWORD:-difyai123456}
       OB_TENANT_PASSWORD: ${OCEANBASE_VECTOR_PASSWORD:-difyai123456}
       OB_CLUSTER_NAME: ${OCEANBASE_CLUSTER_NAME:-difyai}
+      OB_SERVER_IP: 127.0.0.1
       MODE: MINI
     ports:
       - "${OCEANBASE_VECTOR_PORT:-2881}:2881"
+    healthcheck:
+      test: [ 'CMD-SHELL', 'obclient -h127.0.0.1 -P2881 -uroot@test -p$${OB_TENANT_PASSWORD} -e "SELECT 1;"' ]
+      interval: 10s
+      retries: 30
+      start_period: 30s
+      timeout: 10s
 
   # Oracle vector database
   oracle:
