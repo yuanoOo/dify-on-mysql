@@ -703,8 +703,7 @@ def ensure_caches_table_exists():
 @click.option("--directory", prompt=False, help="The target migration script directory.")
 def upgrade_db(directory: Optional[str] = None):
     click.echo("Preparing database migration...")
-
-    # 1. 先确保 caches 表存在（原子操作）
+   # 1. 在MySQL缓存模式下，确保 caches 表存在
     # 这样在MySQL缓存模式下，分布式锁可以正常工作
     if "mysql" in dify_config.SQLALCHEMY_DATABASE_URI_SCHEME and dify_config.CACHE_SCHEME == "mysql":
         try:
@@ -713,8 +712,9 @@ def upgrade_db(directory: Optional[str] = None):
             click.echo(click.style(f"Error: Failed to ensure caches table: {e}", fg="red"))
             click.echo(click.style("Migration stopped due to caches table creation failure.", fg="red"))
             raise Exception(f"Migration failed: {e}")
+   
+    # 2. 使用分布式锁
 
-    # 2. 然后使用分布式锁（可以安全使用了）
     lock = redis_client.lock(name="db_upgrade_lock", timeout=60)
     if lock.acquire(blocking=False):
         try:
