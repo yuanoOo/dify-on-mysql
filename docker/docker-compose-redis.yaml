@@ -608,7 +608,7 @@ services:
 
   # Frontend web application.
   web:
-    image: langgenius/dify-web:1.7.0
+    image: langgenius/dify-web:1.8.0
     restart: always
     environment:
       CONSOLE_API_URL: ${CONSOLE_API_URL:-}
